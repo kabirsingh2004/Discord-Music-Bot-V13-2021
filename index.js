@@ -16,14 +16,12 @@ client.on("ready", () => {
 });
 
 const status = (queue) =>
-  `Volume: \`${queue.volume}%\` | Filter: \`${
-    queue.filter || "Off"
-  }\` | Loop: \`${
-    queue.repeatMode
-      ? queue.repeatMode == 2
-        ? "All Queue"
-        : "This Song"
-      : "Off"
+  `Volume: \`${queue.volume}%\` | Filter: \`${queue.filter || "Off"
+  }\` | Loop: \`${queue.repeatMode
+    ? queue.repeatMode == 2
+      ? "All Queue"
+      : "This Song"
+    : "Off"
   }\` | Autoplay: \`${queue.autoplay ? "On" : "Off"}\``;
 
 // distube events
@@ -36,7 +34,6 @@ distube.on("playSong", (queue, song) => {
     .addField("Requested By", `${song.user}`, true)
     .addField("Duration", `${song.formattedDuration.toString()}`, true)
     .setFooter(status(queue), song.user.displayAvatarURL({ dynamic: true }));
-
   queue.textChannel.send({ embeds: [playembed] });
 });
 distube.on("addSong", (queue, song) => {
@@ -54,6 +51,21 @@ distube.on("addSong", (queue, song) => {
 
   queue.textChannel.send({ embeds: [playembed] });
 });
+distube.on('addList', (queue, plalist) => {
+  let playembed = new Discord.MessageEmbed()
+    .setColor("BLURPLE")
+    .setTitle(`🎵 PlayList Added to Queue `)
+    .setThumbnail(plalist.thumbnail)
+    .setDescription(`[${plalist.name}](${plalist.url})`)
+    .addField("Requested By", `${plalist.user}`, true)
+    .addField("Duration", `${plalist.formattedDuration.toString()}`, true)
+    .setFooter(
+      `Coded By Kabir Singh`,
+      plalist.user.displayAvatarURL({ dynamic: true })
+    );
+
+  queue.textChannel.send({ embeds: [playembed] });
+})
 client.on("messageCreate", async (message) => {
   if (
     !message.guild ||
@@ -66,7 +78,8 @@ client.on("messageCreate", async (message) => {
   let cmd = args.shift()?.toLowerCase();
   if (cmd === "ping") {
     message.channel.send(`>>> Ping :- \`${client.ws.ping}\``);
-  } else if (cmd === "play") {
+  }
+  else if (cmd === "play") {
     let search = args.join(" ");
     let channel = message.member.voice.channel;
     let queue = distube.getQueue(message.guildId);
@@ -111,16 +124,120 @@ client.on("messageCreate", async (message) => {
     }
     distube.play(message, search);
   } else if (cmd === "skip") {
-    let queue = distube.getQueue(message.guildId);
-    if (!message.guild.me.voice.channel) {
-      return message.reply(`>>> Nothing Playing`);
+    let queue = distube.getQueue(message.guild.id);
+    let channel = message.member.voice.channel;
+    if (!channel) {
+      return message.channel.send(`** You need to Join Voice Channel **`)
+    }
+    if (!queue) {
+      return message.channel.send(`** Nothing Playing **`)
     }
     queue.skip();
-  } else if (cmd === "volume") {
-    let amount = parseInt(args[0]);
+    message.channel.send({
+      embeds: [
+        new Discord.MessageEmbed()
+          .setColor("BLURPLE")
+          .setTitle(`Song Skiped`)
+          .setDescription(`Song Changed by ${message.author}`)
+          .setFooter(`Coded by Kabir Singh`)
+      ]
+    })
+
+  } else if (cmd === 'pause') {
     let queue = distube.getQueue(message.guild.id);
-    queue.setVolume(amount);
-    message.channel.send(`>>> Volume set to ${amount}`);
+    let channel = message.member.voice.channel;
+    if (!channel) {
+      return message.channel.send(`** You need to Join Voice Channel **`)
+    }
+    if (!queue.songs.length) {
+      return message.channel.send(`** Nothing Playing **`)
+    }
+    queue.pause()
+    message.channel.send({
+      embeds: [
+        new Discord.MessageEmbed()
+          .setColor("BLURPLE")
+          .setTitle(`Song Pause`)
+          .setDescription(`Song Paushed by ${message.author}`)
+          .setFooter(`Coded by Kabir Singh`)
+      ]
+    })
+  } else if (cmd === 'resume') {
+    let queue = distube.getQueue(message.guild.id);
+    let channel = message.member.voice.channel;
+    if (!channel) {
+      return message.channel.send(`** You need to Join Voice Channel **`)
+    }
+    if (!queue.songs.length) {
+      return message.channel.send(`** Nothing Playing **`)
+    }
+    queue.resume()
+    message.channel.send({
+      embeds: [
+        new Discord.MessageEmbed()
+          .setColor("BLURPLE")
+          .setTitle(`Song Resume`)
+          .setDescription(`Song Resumed by ${message.author}`)
+          .setFooter(`Coded by Kabir Singh`)
+      ]
+    })
+  } else if (cmd === "queue") {
+    let queue = distube.getQueue(message.guild.id);
+    let channel = message.member.voice.channel;
+    if (!channel) {
+      return message.channel.send(`** You need to Join Voice Channel **`)
+    }
+    if (!queue.songs.length) {
+      return message.channel.send(`** Nothing Playing **`)
+    }
+    if (queue.playing) {
+      let embedsc = queue.songs.map((song, index) => {
+        return `${index + 1} [${song.name}](${song.url}) \`[${song.formattedDuration}]\``
+      })
+
+      message.channel.send({
+        embeds: [
+          new Discord.MessageEmbed()
+            .setColor('BLURPLE')
+            .setTitle(`Queue Of \`${message.guild.name}\``)
+            .setDescription(`>>> ${embedsc.join("\n")}`.substr(0, 3000))
+            .setFooter(`${queue.songs.length} Songs`, message.guild.iconURL({ dynamic: true }))
+        ]
+      })
+
+    }
+  } else if (cmd === "np") {
+    let queue = distube.getQueue(message.guild.id);
+    if (!queue.songs.length) {
+      return message.channel.send(`** Nothing Playing **`)
+    }
+    let song = queue.songs[0];
+    let embed = new Discord.MessageEmbed()
+      .setAuthor(`Now Playing`, song.thumbnail)
+      .setColor('BLURPLE')
+      .setTitle(song.name)
+      .setURL(song.url)
+      .setThumbnail(song.thumbnail)
+      .addFields([
+        {
+          name: "**Duration**",
+          value: `>>> ${song.formattedDuration.toString()}`,
+          inline: true
+        },
+        {
+          name: "**User**",
+          value: `>>> ${song.user}`,
+          inline: true
+        },
+        {
+          name: "**Views**",
+          value: `>>> ${song.views.toLocaleString()}`,
+          inline: true
+        }
+      ])
+
+    message.channel.send({ embeds: [embed] })
   }
 });
 client.login(config.token);
+
